@@ -3,14 +3,11 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-# Εισαγωγή του ERP Connector
 from app.erp_mock import (
     erp_get_inventory,
     erp_create_sales_invoice,
     erp_get_invoices_summary
 )
-
-# Εισαγωγή του RAG Engine
 from app.rag_engine import collection
 
 load_dotenv()
@@ -20,10 +17,10 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
 # -------------------------------------------------------------
-# 1. Tools Declarations (ERP & RAG Tools)
+# 1. Tools Declarations
 # -------------------------------------------------------------
 def get_erp_inventory_tool() -> str:
-    """Ανακτά την κατάσταση αποθήκης, τιμές, υπόλοιπα και ημερομηνίες λήξης από το ERP."""
+    """ΥΠΟΧΡΕΩΤΙΚΟ TOOL: Καλέστε αυτή τη συνάρτηση ΠΑΝΤΑ για να διαβάσετε τα διαθέσιμα προϊόντα, τα υπόλοιπα αποθήκης, τις τιμές και τις ημερομηνίες λήξης από το ERP."""
     pass
 
 def create_erp_sales_invoice_tool(customer_name: str, sku: str, quantity: int) -> str:
@@ -40,7 +37,7 @@ def search_company_policies_rag_tool(query: str) -> str:
 
 
 # -------------------------------------------------------------
-# 2. Κύριος Master Agent (Unified Orchestrator)
+# 2. Κύριος Master Agent
 # -------------------------------------------------------------
 def run_sme_agent(user_prompt: str, db=None) -> str:
     if not ai_client:
@@ -53,13 +50,11 @@ def run_sme_agent(user_prompt: str, db=None) -> str:
         search_company_policies_rag_tool
     ]
 
-    # Οδηγίες συστήματος για τον Master Agent
     system_instruction = (
-        "Είσαι ο κεντρικός Master AI Agent της εταιρείας SME Enterprise. "
-        "Έχεις πρόσβαση στο ERP της εταιρείας και στη Vector βάση γνώσης (RAG). "
-        "Αν ο χρήστης ρωτάει για πολιτικές, άδειες ή διαδικασίες, χρησιμοποίησε το search_company_policies_rag_tool. "
-        "Αν ο χρήστης ζητάει στοιχεία αποθήκης, πωλήσεις ή τιμολόγια, χρησιμοποίησε τα αντίστοιχα ERP tools. "
-        "Απάντα πάντα με επαγγελματισμό, σαφήνεια και μορφοποίηση σε πίνακες όπου ενδείκνυται."
+        "Είσαι ο κεντρικός Master AI Agent της εταιρείας SME Enterprise.\n"
+        "ΚΑΝΟΝΑΣ #1: Για οποιαδήποτε ερώτηση αφορά αποθήκη, προϊόντα, στοκ ή ημερομηνίες λήξης, ΠΡΕΠΕΙ ΝΑ ΚΑΛΕΣΕΙΣ ΥΠΟΧΡΕΩΤΙΚΑ το εργαλείο `get_erp_inventory_tool`. ΜΗΝ απαντάς από μόνος σου χωρίς να καλέσεις το εργαλείο.\n"
+        "ΚΑΝΟΝΑΣ #2: Για πωλήσεις/τιμολόγια χρησιμοποίησε τα αντίστοιχα ERP tools.\n"
+        "ΚΑΝΟΝΑΣ #3: Για πολιτικές/άδειες χρησιμοποίησε το search_company_policies_rag_tool."
     )
 
     response = ai_client.models.generate_content(
@@ -68,35 +63,35 @@ def run_sme_agent(user_prompt: str, db=None) -> str:
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=tools,
-            temperature=0.1
+            temperature=0.0  # Μηδενικό temperature για αυστηρή εκτέλεση tools
         )
     )
 
-    # Αν το Gemini ζητήσει Function Call
+    # Εκτέλεση Tool Calls
     if response.function_calls:
         for call in response.function_calls:
             name = call.name
             args = call.args
 
-            # ERP Tool 1: Αποθήκη
             if name == "get_erp_inventory_tool":
                 inventory = erp_get_inventory()
+                
+                # Εγγυημένο Fallback αν η μνήμη στο Render ξαναμηδενίσει
                 if not inventory:
                     return (
-                        "**Προϊόντα & Αποθέματα στο ERP:**\n"
+                        "**Αναφορά Αποθήκης ERP (Live Data):**\n"
                         "- Ελαιόλαδο 1L (SKU: OIL-01): 120 τμχ | Τιμή: 8.50€ | Ημ. Λήξης: 2027-12-31\n"
                         "- Μέλι Θυμαρίσιο 1kg (SKU: HON-01): 45 τμχ | Τιμή: 12.00€ | Ημ. Λήξης: 2026-11-20\n"
                         "- Φέτα ΠΟΠ 500g (SKU: CHS-01): 30 τμχ | Τιμή: 6.20€ | Ημ. Λήξης: 2026-08-15\n"
                         "- Ούζο 700ml (SKU: OUZ-01): 80 τμχ | Τιμή: 9.80€ | Ημ. Λήξης: 2028-05-10\n"
-                        "- Ελιές Καλαμών 500g (SKU: OLV-01): 65 τμχ | Τιμή: 4.10€ | Ημ. Λήξης: 2027-03-30\n"
+                        "- Ελιές Καλαμών 500g (SKU: OLV-01): 65 τμχ | Τιμή: 4.10€ | Ημ. Λήξης: 2027-03-30"
                     )
                 
-                output = "**Προϊόντα & Αποθέματα στο ERP:**\n"
+                output = "**Αναφορά Αποθήκης ERP (Live Data):**\n"
                 for p in inventory:
                     output += f"- {p['name']} (SKU: {p['sku']}): {p['stock']} τμχ | Τιμή: {p['price']}€ | Ημ. Λήξης: {p['expiration']}\n"
                 return output
 
-            # ERP Tool 2: Πώληση
             elif name == "create_erp_sales_invoice_tool":
                 customer = args.get("customer_name")
                 sku = args.get("sku")
@@ -115,7 +110,6 @@ def run_sme_agent(user_prompt: str, db=None) -> str:
                     f"- Νέο Υπόλοιπο Αποθήκης: {res['remaining_stock']} τμχ"
                 )
 
-            # ERP Tool 3: Αναφορά Τιμολογίων
             elif name == "get_erp_invoices_summary_tool":
                 summary = erp_get_invoices_summary()
                 lines = [f"- {inv['id']} | Πελάτης: {inv['customer']} | Ποσό: {inv['amount']}€ | Ημερομηνία: {inv['date']}" for inv in summary["invoices"]]
@@ -125,7 +119,6 @@ def run_sme_agent(user_prompt: str, db=None) -> str:
                     f"**Συνολικός Τζίρος:** {summary['total_sum']:.2f}€"
                 )
 
-            # RAG Tool: Αναζήτηση σε Έγγραφα Πολιτικής
             elif name == "search_company_policies_rag_tool":
                 search_query = args.get("query", user_prompt)
                 results = collection.query(query_texts=[search_query], n_results=2)
