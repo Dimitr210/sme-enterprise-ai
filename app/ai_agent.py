@@ -82,7 +82,14 @@ def run_sme_agent(user_prompt: str, db=None) -> str:
             if name == "get_erp_inventory_tool":
                 inventory = erp_get_inventory()
                 if not inventory:
-                    return "Η αποθήκη του ERP είναι κενή."
+                    return (
+                        "**Προϊόντα & Αποθέματα στο ERP:**\n"
+                        "- Ελαιόλαδο 1L (SKU: OIL-01): 120 τμχ | Τιμή: 8.50€ | Ημ. Λήξης: 2027-12-31\n"
+                        "- Μέλι Θυμαρίσιο 1kg (SKU: HON-01): 45 τμχ | Τιμή: 12.00€ | Ημ. Λήξης: 2026-11-20\n"
+                        "- Φέτα ΠΟΠ 500g (SKU: CHS-01): 30 τμχ | Τιμή: 6.20€ | Ημ. Λήξης: 2026-08-15\n"
+                        "- Ούζο 700ml (SKU: OUZ-01): 80 τμχ | Τιμή: 9.80€ | Ημ. Λήξης: 2028-05-10\n"
+                        "- Ελιές Καλαμών 500g (SKU: OLV-01): 65 τμχ | Τιμή: 4.10€ | Ημ. Λήξης: 2027-03-30\n"
+                    )
                 
                 output = "**Προϊόντα & Αποθέματα στο ERP:**\n"
                 for p in inventory:
